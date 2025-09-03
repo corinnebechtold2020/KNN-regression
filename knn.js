@@ -6,6 +6,7 @@ const kSelect = document.getElementById('k-select');
 const scatterBtn = document.getElementById('scatter-btn');
 const classifyBtn = document.getElementById('classify-btn');
 
+
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 const POINT_RADIUS = 8;
@@ -15,6 +16,7 @@ const N_POINTS = 30;
 let points = [];
 let unknownPoint = null;
 let neighbors = [];
+let hoverPoint = null;
 
 function normalRandom(mean = 0.5, std = 0.18) {
     // Box-Muller transform
@@ -48,11 +50,13 @@ function draw() {
         ctx.globalAlpha = 0.7;
         ctx.fill();
         ctx.globalAlpha = 1.0;
-        // Value label
-        ctx.fillStyle = '#222';
-        ctx.font = '13px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(p.value.toFixed(2), p.x * WIDTH, p.y * HEIGHT - 14);
+        // Value label only on hover
+        if (hoverPoint && hoverPoint.type === 'known' && hoverPoint.point === p) {
+            ctx.fillStyle = '#222';
+            ctx.font = '13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(p.value.toFixed(2), p.x * WIDTH, p.y * HEIGHT - 14);
+        }
     }
     // Draw neighbors (if any)
     if (neighbors.length > 0) {
@@ -72,8 +76,10 @@ function draw() {
         ctx.globalAlpha = 0.8;
         ctx.fill();
         ctx.globalAlpha = 1.0;
-        // If classified, show value
-        if (unknownPoint.value !== undefined) {
+        // If classified, show value only on hover or always if classified
+        if (unknownPoint.value !== undefined && (
+            (hoverPoint && hoverPoint.type === 'unknown') || unknownPoint.value !== undefined
+        )) {
             ctx.fillStyle = '#222';
             ctx.font = 'bold 15px sans-serif';
             ctx.textAlign = 'center';
@@ -81,6 +87,42 @@ function draw() {
         }
     }
 }
+function getPointAtMouse(mx, my) {
+    // mx, my in canvas coordinates
+    // Check known points
+    for (const p of points) {
+        const dx = mx - p.x * WIDTH;
+        const dy = my - p.y * HEIGHT;
+        if (dx * dx + dy * dy <= POINT_RADIUS * POINT_RADIUS + 8) {
+            return { type: 'known', point: p };
+        }
+    }
+    // Check unknown point
+    if (unknownPoint) {
+        const dx = mx - unknownPoint.x * WIDTH;
+        const dy = my - unknownPoint.y * HEIGHT;
+        if (dx * dx + dy * dy <= UNKNOWN_RADIUS * UNKNOWN_RADIUS + 8) {
+            return { type: 'unknown', point: unknownPoint };
+        }
+    }
+    return null;
+}
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const found = getPointAtMouse(mx, my);
+    if (found !== hoverPoint) {
+        hoverPoint = found;
+        draw();
+    }
+});
+
+canvas.addEventListener('mouseleave', () => {
+    hoverPoint = null;
+    draw();
+});
 
 function scatterInitialPoints() {
     points = randomPoints(N_POINTS);
